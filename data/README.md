@@ -34,4 +34,16 @@ Place API tokens, institution credentials, or CLI overrides under `data/config/`
 
 ## How the CLI Uses This Directory
 
-All ingestion commands will default to `./data` as their root. The upcoming `shadow import` command resolves paths relative to this directory unless you override it with `--data-dir` or the `FINAZZLE_DATA_DIR` environment variable. That keeps every prototype run local while making it easy to wipe/refresh inputs without touching git history.
+The `finazzle shadow import` command ingests CSV files relative to this directory. For example:
+
+```
+FINAZZLE_DATA_DIR=./data pnpm --filter @finazzle/cli run cli -- shadow import checking/jan.csv credit/amex.csv
+```
+
+- Omit `FINAZZLE_DATA_DIR` to default to `./data`, or pass `--data-dir /custom/path` per run.
+- Paths are resolved after the data directory, so `checking/jan.csv` reads `data/checking/jan.csv`.
+- Imports are idempotent—running the same command twice will skip rows already present in the
+  database.
+
+Keeping everything inside `data/` ensures the SQLite "Shadow Register" and raw exports stay out of
+git while remaining easy to refresh or wipe locally.

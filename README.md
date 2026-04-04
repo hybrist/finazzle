@@ -85,3 +85,23 @@ pnpm build   # builds every workspace package
 pnpm lint    # runs eslint in each package
 pnpm test    # executes package-level test suites
 ```
+
+## Shadow Register CLI
+
+The CLI exposes a `shadow` namespace for the local SQLite "Shadow Register". Use the `import`
+subcommand to normalize CSV exports into `data/shadow-register.db` (or a custom path):
+
+```
+pnpm --filter @finazzle/cli run cli -- shadow import checking/jan.csv credit/amex.csv
+```
+
+- CSV headers must match `date`, `description`, `amount`, `account_id`, and `source` (see
+  `data/README.md` for details).
+- Relative paths resolve from the data directory (`./data` by default). Override with
+  `--data-dir <path>` or `FINAZZLE_DATA_DIR=/custom/data`.
+- The importer deduplicates transactions by account/date/description/amount and reports how many
+  rows were added.
+
+The SQLite schema for `accounts` and `transactions` lives in
+`packages/cli/src/shadow-register/schema.ts` and is applied automatically the first time you run an
+import.

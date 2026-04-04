@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import { buildBanner } from './banner';
+import { registerShadowCommands } from './shadow-register/commands';
 
 const program = new Command();
 
@@ -16,6 +17,8 @@ program
     // eslint-disable-next-line no-console
     console.log(banner);
   });
+
+registerShadowCommands(program);
 
 program.showHelpAfterError('(run with --help for usage info)');
 
