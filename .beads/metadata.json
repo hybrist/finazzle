@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "finazzle",
+  "project_id": "88e37502-0345-4759-9d44-c40c3b244571"
+}
