@@ -64,3 +64,24 @@ This plan outlines an iterative approach to building a local-first application d
 ---
 
 > **Immediate Next Step:** Identify the "Noise Fingerprints" in your current bank exports. Look for the specific strings used for Credit Card payments and internal transfers to seed the Phase 1 suppression engine.
+
+---
+
+## Local Workspace
+
+### Requirements
+- Node.js 20+
+- pnpm 9+
+
+### Install & Run
+1. Install dependencies once: `pnpm install`
+2. Execute the CLI banner in watch mode: `pnpm cli`
+3. Build the CLI binary + run it via the package script: `pnpm --filter @finazzle/cli run cli`
+
+Additional scripts are available from the repo root:
+
+```
+pnpm build   # builds every workspace package
+pnpm lint    # runs eslint in each package
+pnpm test    # executes package-level test suites
+```
