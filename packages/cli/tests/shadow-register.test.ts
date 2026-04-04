@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { importCsvFiles, openShadowRegister } from '../src/shadow-register/importer';
+import { matchTransfers } from '../src/shadow-register/matcher';
 
 describe('shadow register importer', () => {
   let tempDir: string;
@@ -74,6 +75,68 @@ describe('shadow register importer', () => {
 
     const { db } = openShadowRegister({ dataDir });
     expect(() => importCsvFiles(db, [csvPath], { dataDir })).toThrow(/Row 2/);
+    db.close();
+  });
+
+  test('matchTransfers hides eligible cross-account transfers', () => {
+    const checkingCsv = [
+      'date,description,amount,account_id,source',
+      '2024-03-05,Transfer to savings,-500.00,checking_main,boa_checking',
+      '2024-03-07,Groceries,-120.00,checking_main,boa_checking',
+    ].join('\n');
+    const savingsCsv = [
+      'date,description,amount,account_id,source',
+      '2024-03-06,Transfer from checking,500.00,savings_ny,ally_savings',
+      '2024-03-08,Interest,1.25,savings_ny,ally_savings',
+    ].join('\n');
+
+    fs.writeFileSync(path.join(dataDir, 'checking.csv'), checkingCsv);
+    fs.writeFileSync(path.join(dataDir, 'savings.csv'), savingsCsv);
+
+    const { db } = openShadowRegister({ dataDir });
+    importCsvFiles(db, ['checking.csv', 'savings.csv'], { dataDir });
+
+    const summary = matchTransfers(db, { sampleLimit: 2 });
+    expect(summary.pairsMatched).toBe(1);
+    expect(summary.transactionsHidden).toBe(2);
+    expect(summary.sample).toHaveLength(1);
+    expect(summary.sample[0].debit.description).toBe('Transfer to savings');
+
+    const hiddenRows = db
+      .prepare(`SELECT description, hidden FROM transactions WHERE description LIKE 'Transfer%' ORDER BY description`)
+      .all() as { description: string; hidden: number }[];
+    expect(hiddenRows.every((row) => row.hidden === 1)).toBe(true);
+
+    const secondPass = matchTransfers(db);
+    expect(secondPass.pairsMatched).toBe(0);
+    db.close();
+  });
+
+  test('matchTransfers enforces date and amount tolerances', () => {
+    const csvA = [
+      'date,description,amount,account_id,source',
+      '2024-04-01,Wire to brokerage,-750.00,checking_main,boa_checking',
+      '2024-04-10,Savings transfer,-300.00,checking_main,boa_checking',
+    ].join('\n');
+    const csvB = [
+      'date,description,amount,account_id,source',
+      '2024-04-05,Brokerage wire,750.00,brokerage_taxable,fidelity_taxable',
+      '2024-04-11,Savings inbound,299.99,savings_ny,ally_savings',
+    ].join('\n');
+
+    fs.writeFileSync(path.join(dataDir, 'a.csv'), csvA);
+    fs.writeFileSync(path.join(dataDir, 'b.csv'), csvB);
+
+    const { db } = openShadowRegister({ dataDir });
+    importCsvFiles(db, ['a.csv', 'b.csv'], { dataDir });
+
+    const summary = matchTransfers(db);
+    expect(summary.pairsMatched).toBe(0);
+
+    const hiddenCount = db
+      .prepare('SELECT COUNT(*) AS count FROM transactions WHERE hidden = 1')
+      .get() as { count: number };
+    expect(hiddenCount.count).toBe(0);
     db.close();
   });
 });
