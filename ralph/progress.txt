@@ -1,1 +1,4 @@
 # Progress Log
+
+## 2026-04-04
+- Added gitignored `data/` staging area README and updated `.gitignore`; ran `./check` and closed finazzle-2w0.

@@ -6,3 +6,5 @@ coverage
 .vscode
 pnpm-debug.log
 .beads/
+data/*
+!data/README.md
