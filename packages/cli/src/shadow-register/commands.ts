@@ -1,9 +1,14 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { Command } from 'commander';
 import { importCsvFiles, openShadowRegister, ShadowRegisterConfig, ImportSummary } from './importer';
 import { matchTransfers, MatchSummary } from './matcher';
+import { ColumnMappingConfig, createMappingNormalizer } from './normalizer';
 
 interface ImportOptions extends ShadowRegisterConfig {
   silent?: boolean;
+  mapping?: string;
 }
 
 interface MatchOptions extends ShadowRegisterConfig {
@@ -20,11 +25,17 @@ export function registerShadowCommands(program: Command) {
     .argument('<csv...>', 'CSV files to ingest (relative to the data directory by default)')
     .option('--data-dir <path>', 'Override the data directory root')
     .option('--db-file <filename>', 'Override the SQLite filename within the data dir')
+    .option(
+      '--mapping <path>',
+      'Path to a JSON config describing how to normalize incoming CSV headers',
+    )
     .option('--silent', 'Suppress verbose progress logs', false)
     .action((csv: string[], options: ImportOptions) => {
       const { db, dataDir, dbPath } = openShadowRegister(options);
       try {
-        const summaries = importCsvFiles(db, csv, { dataDir });
+        const mappingConfig = options.mapping ? loadMappingConfig(options.mapping, dataDir) : undefined;
+        const normalizer = mappingConfig ? createMappingNormalizer(mappingConfig) : undefined;
+        const summaries = importCsvFiles(db, csv, { dataDir, normalizer });
         if (!options.silent) {
           printShadowSummary({ summaries, dataDir, dbPath });
         }
@@ -53,6 +64,23 @@ export function registerShadowCommands(program: Command) {
         db.close();
       }
     });
+}
+
+function loadMappingConfig(input: string, dataDir: string): ColumnMappingConfig {
+  if (!input) {
+    throw new Error('mapping path must not be empty');
+  }
+  const expanded = input.startsWith('~/') ? path.join(os.homedir(), input.slice(2)) : input;
+  const absolute = path.isAbsolute(expanded) ? expanded : path.resolve(dataDir, expanded);
+  if (!fs.existsSync(absolute)) {
+    throw new Error(`Mapping config not found: ${absolute}`);
+  }
+  const payload = fs.readFileSync(absolute, 'utf8');
+  const parsed = JSON.parse(payload);
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error(`Mapping config must contain a JSON object: ${absolute}`);
+  }
+  return parsed as ColumnMappingConfig;
 }
 
 function printShadowSummary(details: {

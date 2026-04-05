@@ -4,6 +4,7 @@ import os from 'node:os';
 import Database from 'better-sqlite3';
 import { parse } from 'csv-parse/sync';
 import { shadowRegisterSchema } from './schema';
+import { CsvRowNormalizer } from './normalizer';
 
 const DEFAULT_DB_FILE = 'shadow-register.db';
 
@@ -14,6 +15,7 @@ export interface ShadowRegisterConfig {
 
 export interface ImportContext {
   dataDir: string;
+  normalizer?: CsvRowNormalizer;
 }
 
 export interface ImportSummary {
@@ -82,9 +84,13 @@ function importSingleFile(
     trim: true,
   }) as Record<string, string>[];
 
-  const normalizedRows = parsedRows.map((row, index) =>
-    normalizeRow(row, index + 2, displayName),
-  );
+  const normalizedRows = parsedRows.map((row, index) => {
+    const rowNumber = index + 2;
+    const canonicalRow = context.normalizer
+      ? context.normalizer(row, { rowNumber, fileLabel: displayName })
+      : row;
+    return normalizeRow(canonicalRow, rowNumber, displayName);
+  });
 
   const upsertAccount = db.prepare(
     `INSERT INTO accounts (id, source)

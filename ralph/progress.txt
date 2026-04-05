@@ -5,3 +5,6 @@
 - Implemented the Shadow Register SQLite schema plus `finazzle shadow import`; documented usage, added importer tests, ran `./check`, and closed finazzle-514.
 - Built the transfer matching engine + `finazzle shadow match` report, covering CLI + matcher tests, ran `./check`, and prepared to close finazzle-9x3.
 - Crafted fabricated Chase test cases covering normalization -> `shadow import` -> `shadow match`, documented the fixtures, ran `./check`, and closed finazzle-bw9.
+
+## 2026-04-05
+- Added the CSV normalization layer + `--mapping` option for `finazzle shadow import`, covering normalizer module, importer wiring, docs, and tests; ran `./check` and closed finazzle-846.

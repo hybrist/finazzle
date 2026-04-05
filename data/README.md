@@ -28,6 +28,30 @@ Phase 1 of the CLI expects normalized columns when loading into the SQLite "Shad
 
 If a bank export ships different headers, adjust them before dropping the file here so the importer can ingest without custom parsers.
 
+## Normalizing Raw Bank Exports
+
+`finazzle shadow import` can now remap CSV headers on the fly. Pass `--mapping config/checking.json` (relative to the data directory) to describe how a bank's export should translate into the canonical schema plus which metadata to inject:
+
+```
+{
+  "columns": {
+    "Transaction Date": "date",
+    "Details": "description",
+    "Amount": "amount"
+  },
+  "defaults": {
+    "account_id": "checking_demo",
+    "source": "chase_checking"
+  }
+}
+```
+
+- `columns` keys are the raw headers present in the CSV.
+- `columns` values must be one of `date`, `description`, `amount`, `account_id`, or `source`.
+- `defaults` fills in canonical columns that are missing or blank (handy for `account_id`/`source`).
+
+The mapping file lives alongside your exports (for example `data/config/chase-checking.json`). When you run the importer, each row is normalized according to this mapping before validation, so you can point at raw bank downloads without editing them first.
+
 ## Config Files
 
 Place API tokens, institution credentials, or CLI overrides under `data/config/`. These files are intentionally untracked. When you need to share environment defaults, create template files (e.g. `env.example`) outside of `data/` and keep the secrets here.

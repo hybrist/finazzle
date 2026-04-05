@@ -4,6 +4,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { importCsvFiles, openShadowRegister } from '../src/shadow-register/importer';
 import { matchTransfers } from '../src/shadow-register/matcher';
+import { createMappingNormalizer } from '../src/shadow-register/normalizer';
 
 describe('shadow register importer', () => {
   let tempDir: string;
@@ -137,6 +138,60 @@ describe('shadow register importer', () => {
       .prepare('SELECT COUNT(*) AS count FROM transactions WHERE hidden = 1')
       .get() as { count: number };
     expect(hiddenCount.count).toBe(0);
+    db.close();
+  });
+
+  test('applies CSV header mappings and metadata defaults', () => {
+    const csvPath = path.join(dataDir, 'raw-checking.csv');
+    const csv = [
+      'Transaction Date,Details,Amount',
+      '2024-05-01,SAMPLE PAYROLL,5079.58',
+      '2024-05-02,SAMPLE ATM WITHDRAW,-322.62',
+    ].join('\n');
+    fs.writeFileSync(csvPath, csv);
+
+    const normalizer = createMappingNormalizer({
+      columns: {
+        'Transaction Date': 'date',
+        Details: 'description',
+        Amount: 'amount',
+      },
+      defaults: {
+        account_id: 'checking_demo',
+        source: 'chase_checking',
+      },
+    });
+
+    const { db } = openShadowRegister({ dataDir });
+    const [summary] = importCsvFiles(db, [csvPath], { dataDir, normalizer });
+    expect(summary.inserted).toBe(2);
+
+    const accountRow = db.prepare('SELECT id, source FROM accounts').get() as {
+      id: string;
+      source: string;
+    };
+    expect(accountRow).toEqual({ id: 'checking_demo', source: 'chase_checking' });
+    db.close();
+  });
+
+  test('fails when mappings cannot satisfy canonical columns', () => {
+    const csvPath = path.join(dataDir, 'raw-credit.csv');
+    const csv = ['Transaction Date,Details', '2024-05-03,Credit refund'].join('\n');
+    fs.writeFileSync(csvPath, csv);
+
+    const normalizer = createMappingNormalizer({
+      columns: {
+        'Transaction Date': 'date',
+        Details: 'description',
+      },
+      defaults: {
+        account_id: 'credit_demo',
+        source: 'amex_demo',
+      },
+    });
+
+    const { db } = openShadowRegister({ dataDir });
+    expect(() => importCsvFiles(db, [csvPath], { dataDir, normalizer })).toThrow(/amount/i);
     db.close();
   });
 });
